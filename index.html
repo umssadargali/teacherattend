@@ -2,53 +2,75 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UMS Sadar Gali Attendance</title>
+    <title>Iqra Public School Attendance</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0fdf4; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
         .card { background: white; width: 100%; max-width: 360px; padding: 15px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #2e7d32; }
-        h2 { color: #2e7d32; margin: 5px 0; font-size: 20px; }
-        #clock { font-size: 42px; font-weight: bold; color: #ff5722; font-family: monospace; margin: 5px 0; }
-        #date { font-size: 14px; color: #666; margin-bottom: 10px; }
-        select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 10px; font-size: 15px; }
-        .cam-box { width: 100%; border-radius: 10px; overflow: hidden; border: 2px solid #4CAF50; background: #000; aspect-ratio: 4/3; margin-bottom: 10px; }
+        
+        h2 { color: #2e7d32; margin: 5px 0 2px 0; font-size: 22px; text-transform: uppercase; }
+        .sub-header { color: #444; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
+        
+        #clock { font-size: 42px; font-weight: bold; color: #ff5722; font-family: monospace; margin: 5px 0; letter-spacing: 2px; }
+        #date { font-size: 15px; color: #666; margin-bottom: 15px; }
+        
+        select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 10px; font-size: 16px; background: #fff; font-weight: 600; color: #333; }
+        
+        .cam-box { width: 100%; border-radius: 10px; overflow: hidden; border: 3px solid #4CAF50; background: #000; aspect-ratio: 4/3; margin-bottom: 10px; position: relative; }
         video, img { width: 100%; height: 100%; object-fit: cover; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; color: white; margin-bottom: 8px; }
+        
+        .btn-box { display: flex; flex-direction: column; gap: 8px; }
+        button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
+        button:active { transform: scale(0.95); }
+        
         .b-snap { background: #673ab7; }
         .b-in { background: #4CAF50; }
         .b-out { background: #f44336; }
-        #status { font-size: 13px; font-weight: bold; margin-top: 5px; color: #333; }
+        
+        #status { font-size: 14px; font-weight: bold; margin: 10px 0; color: #333; min-height: 20px; }
+        
+        .footer { font-size: 12px; color: #777; margin-top: 15px; line-height: 1.6; }
+        .success-msg { color: #2e7d32; font-size: 16px; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <h2>IQRA PUBLIC SCHOOL</h2>
+    <div class="sub-header">Students Attendance System</div>
+    
     <div id="clock">00:00:00</div>
     <div id="date">Loading...</div>
 
-    <select id="sList"><option>Fetching Names...</option></select>
+    <select id="sList"><option>Connecting to Sheet...</option></select>
 
     <div class="cam-box">
         <video id="v" autoplay playsinline></video>
         <img id="p" style="display:none;">
     </div>
 
-    <button class="b-snap" onclick="snap()">📸 CAPTURE PHOTO</button>
-    <button class="b-in" id="iB" onclick="send('check-in')">SCHOOL-IN</button>
-    <button class="b-out" id="oB" onclick="send('check-out')">SCHOOL-OUT</button>
+    <div class="btn-box">
+        <button class="b-snap" id="snapBtn" onclick="snap()">📸 CAPTURE PHOTO</button>
+        <button class="b-in" id="iB" onclick="send('check-in')">SCHOOL-IN</button>
+        <button class="b-out" id="oB" onclick="send('check-out')">SCHOOL-OUT</button>
+    </div>
 
     <div id="status">Ready</div>
+
+    <div class="footer">
+        Location and camera permissions are required.<br>
+        <b>Created by Riyaz Ahmad, PGT Zoology</b>
+    </div>
 </div>
 
 <canvas id="c" style="display:none;"></canvas>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFnvGKyVIATmbIGxXyVjt7NjKM8dRHMKElJB0uVbxWn_7LAQHw33P3VxImxos2N3sv1A/exec"; 
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFnvGKyVIATmbIGxXyVjt7NjKM8dRHMKElJB0uVbxWn_7LAQHw33P3VxImxos2N3sv1A/exec"; // <--- Apna URL yahan dalein
 
     function tick() {
         const n = new Date();
         document.getElementById('clock').innerText = n.toLocaleTimeString('en-GB');
-        document.getElementById('date').innerText = n.toDateString();
+        document.getElementById('date').innerText = n.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
     setInterval(tick, 1000); tick();
 
@@ -60,26 +82,46 @@
             d.forEach(n => s.innerHTML += `<option value="${n}">${n}</option>`);
         }).catch(() => document.getElementById('status').innerText = "Network Error!");
 
-    const v = document.getElementById('v');
-    navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}}).then(s => v.srcObject=s);
+    // Start Camera
+    let stream;
+    async function startCam() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}});
+            document.getElementById('v').srcObject = stream;
+        } catch (err) {
+            document.getElementById('status').innerText = "Camera Access Denied!";
+        }
+    }
+    startCam();
 
     let b64 = "";
     function snap() {
         const cn = document.getElementById('c');
-        cn.width = 250; cn.height = 180; // Small size for speed
+        const v = document.getElementById('v');
+        const p = document.getElementById('p');
+        
+        cn.width = 250; cn.height = 180;
         cn.getContext('2d').drawImage(v, 0, 0, 250, 180);
-        b64 = cn.toDataURL('image/jpeg', 0.3); // Compressed
-        document.getElementById('p').src = b64;
-        document.getElementById('p').style.display = "block";
+        b64 = cn.toDataURL('image/jpeg', 0.3);
+        
+        p.src = b64;
+        p.style.display = "block";
         v.style.display = "none";
         document.getElementById('status').innerText = "Photo Ready!";
+        document.getElementById('snapBtn').innerText = "🔄 RETAKE PHOTO";
     }
 
     function send(t) {
         const n = document.getElementById('sList').value;
-        if(!b64) return alert("Pehle Photo Capture karein!");
+        const st = document.getElementById('status');
         
-        document.getElementById('status').innerText = "🚀 Sending Attendance...";
+        // Validation: School-In ke liye photo zaroori hai, Out ke liye nahi
+        if(t === 'check-in' && !b64) {
+            alert("School-In ke liye pehle photo capture karein!");
+            return;
+        }
+        
+        st.innerText = "🚀 Sending Attendance...";
         document.getElementById('iB').disabled = true;
         document.getElementById('oB').disabled = true;
 
@@ -93,8 +135,19 @@
                 mode: 'no-cors', 
                 body: JSON.stringify({name: n, type: t, location: l, photo: b64})
             });
-            alert("Attendance Success! ✅");
-            location.reload();
+
+            // UI Reset Logic
+            st.innerHTML = "<span class='success-msg'>✅ Done: " + n + "</span>";
+            
+            setTimeout(() => {
+                b64 = ""; // Reset photo data
+                document.getElementById('p').style.display = "none";
+                document.getElementById('v').style.display = "block";
+                document.getElementById('iB').disabled = false;
+                document.getElementById('oB').disabled = false;
+                document.getElementById('status').innerText = "Ready";
+                document.getElementById('snapBtn').innerText = "📸 CAPTURE PHOTO";
+            }, 2500);
         }
     }
 </script>
